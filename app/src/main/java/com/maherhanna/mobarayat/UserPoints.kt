@@ -9,7 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-
 @Composable
 fun UserPoints(viewModel: FootballViewModel, leagueId: Int) {
     val users by viewModel.users.observeAsState(emptyList())

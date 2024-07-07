@@ -22,7 +22,9 @@ fun LeagueList(viewModel: FootballViewModel, onLeagueSelected: (League) -> Unit)
                 text = league.name,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onLeagueSelected(league) }
+                    .clickable {
+                        onLeagueSelected(league)
+                    }
                     .padding(16.dp)
             )
         }

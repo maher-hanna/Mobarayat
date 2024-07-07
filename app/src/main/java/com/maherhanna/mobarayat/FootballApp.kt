@@ -8,29 +8,27 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 
+import androidx.navigation.compose.*
 
 @Composable
-fun FootballApp(viewModel: FootballViewModel, paddingValues: PaddingValues) {
+fun FootballApp(viewModel: FootballViewModel,paddingValues: PaddingValues) {
     val navController = rememberNavController()
 
-    NavHost(
-        navController,
-        startDestination = "leagues",
-        modifier = Modifier.padding(paddingValues)
-    ) {
+    NavHost(navController, startDestination = "leagues", modifier = Modifier.padding(paddingValues)) {
         composable("leagues") {
             LeagueList(viewModel) { league ->
-                navController.navigate("league/${league.id}")
+                viewModel.fetchGames(league.id){success ->
+                    if (success) {
+                        navController.navigate("league/${league.id}")
+                    }
+                }
             }
         }
         composable("league/{leagueId}") { backStackEntry ->
             val leagueId = backStackEntry.arguments?.getString("leagueId")?.toIntOrNull()
             val league = viewModel.leagues.value?.find { it.id == leagueId }
             league?.let {
-                GameList(it) { gameId, prediction ->
-                    viewModel.addPrediction(it.id, gameId, prediction)
-                    viewModel.calculatePoints(it.id)
-                }
+                GameList(viewModel, it)
             }
         }
         composable("points/{leagueId}") { backStackEntry ->

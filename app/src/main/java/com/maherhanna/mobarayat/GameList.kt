@@ -12,11 +12,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-
 @Composable
-fun GameList(league: League, onPredictionAdded: (Int, Prediction) -> Unit) {
+fun GameList(viewModel: FootballViewModel, league: League) {
+    val games by remember { mutableStateOf(league.games) }
+
     LazyColumn {
-        items(league.games) { game ->
+        items(games) { game ->
             var homeScore by remember { mutableStateOf("") }
             var awayScore by remember { mutableStateOf("") }
 
@@ -36,7 +37,8 @@ fun GameList(league: League, onPredictionAdded: (Int, Prediction) -> Unit) {
                 }
                 Button(onClick = {
                     val prediction = Prediction(1, homeScore.toInt(), awayScore.toInt()) // Example user ID
-                    onPredictionAdded(game.id, prediction)
+                    viewModel.submitPrediction(league.id, game.id, prediction)
+                    viewModel.calculatePoints(league.id)
                 }) {
                     Text("Submit Prediction")
                 }
