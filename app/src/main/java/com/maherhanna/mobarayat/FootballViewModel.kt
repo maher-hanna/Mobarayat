@@ -73,12 +73,12 @@ class FootballViewModel : ViewModel() {
         })
     }
 
-    fun submitPrediction(leagueId: Int, gameId: Int, prediction: Prediction) {
-        val predictionRequest = PredictionRequest(leagueId, gameId, prediction)
+    fun submitPrediction(leagueId: Int,prediction: Prediction) {
+        val predictionRequest = PredictionRequest(prediction.userId, prediction.gameId, prediction.homeScore,prediction.awayScore)
         RetrofitInstance.api.submitPrediction(predictionRequest).enqueue(object : Callback<ApiResponse> {
             override fun onResponse(call: Call<ApiResponse>, response: Response<ApiResponse>) {
                 if (response.isSuccessful && response.body()?.status == "success") {
-                    addPrediction(leagueId, gameId, prediction)
+                    addPrediction(leagueId,prediction)
                 }
             }
 
@@ -88,11 +88,11 @@ class FootballViewModel : ViewModel() {
         })
     }
 
-    private fun addPrediction(leagueId: Int, gameId: Int, prediction: Prediction) {
+    private fun addPrediction(leagueId: Int,prediction: Prediction) {
         val updatedLeagues = _leagues.value?.map { league ->
             if (league.id == leagueId) {
                 val updatedGames = league.games.map { game ->
-                    if (game.id == gameId) {
+                    if (game.id == prediction.gameId) {
                         game.copy(prediction = prediction)
                     } else {
                         game

@@ -22,7 +22,7 @@ fun GameList(viewModel: FootballViewModel, league: League) {
             var awayScore by remember { mutableStateOf("") }
 
             Column {
-                Text(text = "${game.homeTeam} vs ${game.awayTeam}")
+                Text(text = "${game.home_team} vs ${game.away_team}")
                 Row {
                     TextField(
                         value = homeScore,
@@ -36,8 +36,8 @@ fun GameList(viewModel: FootballViewModel, league: League) {
                     )
                 }
                 Button(onClick = {
-                    val prediction = Prediction(1, homeScore.toInt(), awayScore.toInt()) // Example user ID
-                    viewModel.submitPrediction(league.id, game.id, prediction)
+                    val prediction = Prediction(1, gameId = game.id, homeScore.toInt(), awayScore.toInt()) // Example user ID
+                    viewModel.submitPrediction(leagueId = league.id,prediction)
                     viewModel.calculatePoints(league.id)
                 }) {
                     Text("Submit Prediction")
