@@ -1,18 +1,29 @@
 package com.maherhanna.mobarayat
-import android.util.Log
+
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
+import okhttp3.OkHttpClient
+import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.*
+import java.io.IOException
 
 class FootballViewModel : ViewModel() {
+    private val BASE_URL = "https://partshub.ae/mob/"
+
     private val _leagues = MutableLiveData<List<League>>()
     val leagues: LiveData<List<League>> = _leagues
 
     private val _users = MutableLiveData<List<User>>()
     val users: LiveData<List<User>> = _users
+
+    private val client = OkHttpClient()
+    private val gson = Gson()
 
     init {
         fetchLeagues()
@@ -20,79 +31,118 @@ class FootballViewModel : ViewModel() {
     }
 
     private fun fetchLeagues() {
-        RetrofitInstance.api.getLeagues().enqueue(object : Callback<List<League>> {
-            override fun onResponse(call: Call<List<League>>, response: Response<List<League>>) {
-                if (response.isSuccessful) {
-                    _leagues.value = response.body()
-                }
+        val request = Request.Builder()
+            .url("${BASE_URL}leagues.php")
+            .build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                // Handle failure
             }
 
-            override fun onFailure(call: Call<List<League>>, t: Throwable) {
-                // Handle failure
+            override fun onResponse(call: Call, response: Response) {
+                response.body?.let { responseBody ->
+                    val leagueType = object : TypeToken<List<League>>() {}.type
+                    val leagues = gson.fromJson<List<League>>(responseBody.string(), leagueType)
+                    _leagues.postValue(leagues)
+                }
             }
         })
     }
 
     private fun fetchUsers() {
-        RetrofitInstance.api.getUsers().enqueue(object : Callback<List<User>> {
-            override fun onResponse(call: Call<List<User>>, response: Response<List<User>>) {
-                if (response.isSuccessful) {
-                    _users.value = response.body()?.map { user ->
-                        user.copy(leaguePoints = if(user.leaguePoints == null) mutableMapOf() else user.leaguePoints )
-                    }
-                }
+        val request = Request.Builder()
+            .url("${BASE_URL}users.php")
+            .build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                // Handle failure
             }
 
-            override fun onFailure(call: Call<List<User>>, t: Throwable) {
-                // Handle failure
+            override fun onResponse(call: Call, response: Response) {
+                response.body?.let { responseBody ->
+                    val userType = object : TypeToken<List<User>>() {}.type
+                    val users = gson.fromJson<List<User>>(responseBody.string(), userType)
+                    _users.postValue(users.map { user ->
+                        user.copy(leaguePoints = user.leaguePoints ?: mutableMapOf())
+                    })
+                }
             }
         })
     }
 
-    fun fetchGames(leagueId: Int,onResult:(success:Boolean) -> Unit) {
-        RetrofitInstance.api.getGames(leagueId).enqueue(object : Callback<List<Game>> {
-            override fun onResponse(call: Call<List<Game>>, response: Response<List<Game>>) {
-                if (response.isSuccessful) {
+    fun fetchGames(leagueId: Int, callback: (Boolean) -> Unit) {
+        val request = Request.Builder()
+            .url("${BASE_URL}games.php?league_id=$leagueId")
+            .build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                viewModelScope.launch {
+                    withContext(Dispatchers.Main) {
+                        callback(false)
+                    }
+                }
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                response.body?.let { responseBody ->
+
+                    val gameType = object : TypeToken<List<Game>>() {}.type
+                    val games = gson.fromJson<List<Game>>(responseBody.string(), gameType)
                     val updatedLeagues = _leagues.value?.map { league ->
                         if (league.id == leagueId) {
-                            league.copy(games = response.body() ?: emptyList())
+                            league.copy(games = games)
                         } else {
                             league
                         }
                     }
-                    _leagues.value = updatedLeagues
-                    onResult(true)
-                }
-            }
+                    _leagues.postValue(updatedLeagues)
 
-            override fun onFailure(call: Call<List<Game>>, t: Throwable) {
-                // Handle failure
-                Log.d("FootballViewModel", "onFailure: ${t.message}")
-                onResult(false)
+                    viewModelScope.launch {
+                        withContext(Dispatchers.Main) {
+                            callback(true)
+                        }
+                    }
+                } ?: viewModelScope.launch {
+                    withContext(Dispatchers.Main) { callback(false) }
+                }
             }
         })
     }
 
-    fun submitPrediction(leagueId: Int,prediction: Prediction) {
-        val predictionRequest = PredictionRequest(prediction.userId, prediction.gameId, prediction.homeScore,prediction.awayScore)
-        RetrofitInstance.api.submitPrediction(predictionRequest).enqueue(object : Callback<ApiResponse> {
-            override fun onResponse(call: Call<ApiResponse>, response: Response<ApiResponse>) {
-                if (response.isSuccessful && response.body()?.status == "success") {
-                    addPrediction(leagueId,prediction)
-                }
+    fun submitPrediction(leagueId: Int, gameId: Int, prediction: Prediction) {
+        val url = "${BASE_URL}submit_prediction.php?" +
+                "league_id=$leagueId&game_id=$gameId&user_id=${prediction.userId}" +
+                "&home_score=${prediction.homeScore}&away_score=${prediction.awayScore}"
+
+        val request = Request.Builder()
+            .url(url)
+            .build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                // Handle failure
             }
 
-            override fun onFailure(call: Call<ApiResponse>, t: Throwable) {
-                // Handle failure
+            override fun onResponse(call: Call, response: Response) {
+                response.body?.let { responseBody ->
+                    val apiResponse = gson.fromJson(responseBody.string(), ApiResponse::class.java)
+                    if (response.isSuccessful && apiResponse.status == "success") {
+                        addPrediction(leagueId, gameId, prediction)
+                        calculatePoints(leagueId)
+                    }
+                }
             }
         })
     }
 
-    private fun addPrediction(leagueId: Int,prediction: Prediction) {
+    private fun addPrediction(leagueId: Int, gameId: Int, prediction: Prediction) {
         val updatedLeagues = _leagues.value?.map { league ->
             if (league.id == leagueId) {
                 val updatedGames = league.games.map { game ->
-                    if (game.id == prediction.gameId) {
+                    if (game.id == gameId) {
                         game.copy(prediction = prediction)
                     } else {
                         game
@@ -103,7 +153,7 @@ class FootballViewModel : ViewModel() {
                 league
             }
         }
-        _leagues.value = updatedLeagues
+        _leagues.postValue(updatedLeagues)
     }
 
     fun calculatePoints(leagueId: Int) {
@@ -113,6 +163,7 @@ class FootballViewModel : ViewModel() {
             user.leaguePoints[leagueId] = newPoints
             user
         }
-        _users.value = usersList
+        _users.postValue(usersList)
     }
 }
+

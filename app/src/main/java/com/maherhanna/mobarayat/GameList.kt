@@ -37,7 +37,7 @@ fun GameList(viewModel: FootballViewModel, league: League) {
                 }
                 Button(onClick = {
                     val prediction = Prediction(1, gameId = game.id, homeScore.toInt(), awayScore.toInt()) // Example user ID
-                    viewModel.submitPrediction(leagueId = league.id,prediction)
+                    viewModel.submitPrediction(leagueId = league.id,gameId = game.id,prediction)
                     viewModel.calculatePoints(league.id)
                 }) {
                     Text("Submit Prediction")
