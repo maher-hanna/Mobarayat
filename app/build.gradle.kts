@@ -62,6 +62,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.runtime.livedata)
     implementation(libs.com.squareup.okhttp)
+    implementation(libs.com.squareup.okhttp.urlconnection)
     implementation(libs.com.google.code.gson)
 
     testImplementation(libs.junit)

@@ -5,34 +5,49 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
-import okhttp3.OkHttpClient
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.*
 import java.io.IOException
+import java.net.CookieManager
+import java.net.CookiePolicy
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+const val MOBARAYAT_TAG = "MOBARAYAT_TAG"
 
 class FootballViewModel : ViewModel() {
     private val BASE_URL = "https://partshub.ae/mob/"
+    private val API_FOOTBALL_URL = "https://apiv3.apifootball.com/"
+    private val API_KEY = "fe1b87153d955b616d80bec39f43b9326c97f28ba4b7245b16c442c46eac35e8"
 
     private val _leagues = MutableLiveData<List<League>>()
     val leagues: LiveData<List<League>> = _leagues
 
     private val _users = MutableLiveData<List<User>>()
     val users: LiveData<List<User>> = _users
+    val cookieManager: CookieManager = CookieManager()
+    private val client: OkHttpClient
+    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
 
-    private val client = OkHttpClient()
     private val gson = Gson()
 
     init {
+        cookieManager.setCookiePolicy(CookiePolicy.ACCEPT_ALL)
+        client = OkHttpClient
+            .Builder()
+            .cookieJar(JavaNetCookieJar(cookieManager))
+            .build()
         fetchLeagues()
         fetchUsers()
     }
 
     private fun fetchLeagues() {
         val request = Request.Builder()
-            .url("${BASE_URL}leagues.php")
+            .url("${API_FOOTBALL_URL}?action=get_leagues&APIkey=${API_KEY}")
             .build()
 
         client.newCall(request).enqueue(object : Callback {
@@ -42,12 +57,46 @@ class FootballViewModel : ViewModel() {
 
             override fun onResponse(call: Call, response: Response) {
                 response.body?.let { responseBody ->
-                    val leagueType = object : TypeToken<List<League>>() {}.type
-                    val leagues = gson.fromJson<List<League>>(responseBody.string(), leagueType)
+                    val leagueType = object : TypeToken<List<Map<String, String>>>() {}.type
+                    val leaguesData = gson.fromJson<List<Map<String, String>>>(responseBody.string(), leagueType)
+                    val leagues = leaguesData.map { leagueMap ->
+                        val season = leagueMap["league_season"] ?: ""
+                        val (seasonStart, seasonEnd) = parseSeason(season)
+                        League(
+                            id = leagueMap["league_id"]?.toInt() ?: 0,
+                            name = leagueMap["league_name"] ?: "",
+                            seasonStart = seasonStart,
+                            seasonEnd = seasonEnd,
+                            leagueLogo = leagueMap["league_logo"] ?: "",
+                            countryLogo = leagueMap["country_logo"] ?: ""
+                        )
+                    }
                     _leagues.postValue(leagues)
                 }
             }
         })
+    }
+
+    private fun parseSeason(season: String): Pair<Date, Date> {
+        return if (season.contains("/")) {
+            val years = season.split("/")
+            val startYear = years[0].toInt()
+            val endYear = years[1].toInt()
+            val startDate = dateFormat.parse("$startYear-01-01")!!
+            val endDate = dateFormat.parse("$endYear-12-31")!!
+            Pair(startDate, endDate)
+        } else {
+            try{
+                val year = season.toInt()
+                val startDate = dateFormat.parse("$year-01-01")!!
+                val endDate = dateFormat.parse("$year-12-31")!!
+                Pair(startDate, endDate)
+            } catch (ex:Exception){
+                Pair(Date(), Date())
+
+            }
+
+        }
     }
 
     private fun fetchUsers() {
@@ -72,9 +121,15 @@ class FootballViewModel : ViewModel() {
         })
     }
 
-    fun fetchGames(leagueId: Int, callback: (Boolean) -> Unit) {
+    fun fetchGames(league: League, callback: (Boolean) -> Unit) {
         val request = Request.Builder()
-            .url("${BASE_URL}games.php?league_id=$leagueId")
+            .url(
+                "${API_FOOTBALL_URL}?action=get_events&from=${dateFormat.format(league.seasonStart)}&to=${
+                    dateFormat.format(
+                        league.seasonEnd
+                    )
+                }&league_id=${league.id}&APIkey=${API_KEY}"
+            )
             .build()
 
         client.newCall(request).enqueue(object : Callback {
@@ -91,11 +146,11 @@ class FootballViewModel : ViewModel() {
 
                     val gameType = object : TypeToken<List<Game>>() {}.type
                     val games = gson.fromJson<List<Game>>(responseBody.string(), gameType)
-                    val updatedLeagues = _leagues.value?.map { league ->
-                        if (league.id == leagueId) {
+                    val updatedLeagues = _leagues.value?.map { currentLeague ->
+                        if (currentLeague.id == league.id) {
                             league.copy(games = games)
                         } else {
-                            league
+                            currentLeague
                         }
                     }
                     _leagues.postValue(updatedLeagues)

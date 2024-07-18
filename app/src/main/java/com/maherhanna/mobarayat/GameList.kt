@@ -22,7 +22,7 @@ fun GameList(viewModel: FootballViewModel, league: League) {
             var awayScore by remember { mutableStateOf("") }
 
             Column {
-                Text(text = "${game.home_team} vs ${game.away_team}")
+                Text(text = "${game.match_hometeam_name} vs ${game.match_awayteam_name}")
                 Row {
                     TextField(
                         value = homeScore,

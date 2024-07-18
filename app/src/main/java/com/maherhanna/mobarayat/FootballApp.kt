@@ -8,8 +8,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 
-import androidx.navigation.compose.*
-
 @Composable
 fun FootballApp(viewModel: FootballViewModel,paddingValues: PaddingValues) {
     val navController = rememberNavController()
@@ -17,7 +15,7 @@ fun FootballApp(viewModel: FootballViewModel,paddingValues: PaddingValues) {
     NavHost(navController, startDestination = "leagues", modifier = Modifier.padding(paddingValues)) {
         composable("leagues") {
             LeagueList(viewModel) { league ->
-                viewModel.fetchGames(league.id){success ->
+                viewModel.fetchGames(league){ success ->
                     if (success) {
                         navController.navigate("league/${league.id}")
                     }
