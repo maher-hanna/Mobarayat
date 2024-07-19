@@ -1,5 +1,6 @@
 package com.maherhanna.mobarayat
 
+import android.content.Context
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -16,6 +17,11 @@ import java.net.CookiePolicy
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import android.provider.Settings
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 const val MOBARAYAT_TAG = "MOBARAYAT_TAG"
 
@@ -32,6 +38,9 @@ class FootballViewModel : ViewModel() {
     val cookieManager: CookieManager = CookieManager()
     private val client: OkHttpClient
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+
+    var userId by mutableIntStateOf(-1)
+    var userName by mutableStateOf("")
 
     private val gson = Gson()
 
@@ -58,7 +67,8 @@ class FootballViewModel : ViewModel() {
             override fun onResponse(call: Call, response: Response) {
                 response.body?.let { responseBody ->
                     val leagueType = object : TypeToken<List<Map<String, String>>>() {}.type
-                    val leaguesData = gson.fromJson<List<Map<String, String>>>(responseBody.string(), leagueType)
+                    val leaguesData =
+                        gson.fromJson<List<Map<String, String>>>(responseBody.string(), leagueType)
                     val leagues = leaguesData.map { leagueMap ->
                         val season = leagueMap["league_season"] ?: ""
                         val (seasonStart, seasonEnd) = parseSeason(season)
@@ -86,12 +96,12 @@ class FootballViewModel : ViewModel() {
             val endDate = dateFormat.parse("$endYear-12-31")!!
             Pair(startDate, endDate)
         } else {
-            try{
+            try {
                 val year = season.toInt()
                 val startDate = dateFormat.parse("$year-01-01")!!
                 val endDate = dateFormat.parse("$year-12-31")!!
                 Pair(startDate, endDate)
-            } catch (ex:Exception){
+            } catch (ex: Exception) {
                 Pair(Date(), Date())
 
             }
@@ -218,6 +228,52 @@ class FootballViewModel : ViewModel() {
             user
         }
         _users.postValue(usersList)
+    }
+
+    fun registerUser(userName: String, deviceId: String, onSuccess: (Boolean,Int) -> Unit) {
+        val url = "${BASE_URL}register_user.php?user_name=$userName&device_id=$deviceId"
+
+        val request = Request.Builder()
+            .url(url)
+            .build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                onSuccess(false,-1)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                response.body?.let { responseBody ->
+                    val apiResponse = gson.fromJson(responseBody.string(), ApiResponse::class.java)
+                    onSuccess(apiResponse.status == "success",apiResponse.user_id)
+                }
+            }
+        })
+    }
+
+    fun checkUserExistence(userName: String, deviceId: String, callback: (Boolean,Int) -> Unit) {
+        val url = "${BASE_URL}check_user.php?user_name=$userName&device_id=$deviceId"
+
+        val request = Request.Builder()
+            .url(url)
+            .build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                callback(false,-1)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                response.body?.let { responseBody ->
+                    val apiResponse = gson.fromJson(responseBody.string(), ApiResponse::class.java)
+                    callback(apiResponse.status == "exists",apiResponse.user_id)
+                }
+            }
+        })
+    }
+
+    fun getDeviceId(context: Context): String {
+        return Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
     }
 }
 
