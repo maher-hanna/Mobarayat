@@ -1,3 +1,15 @@
 package com.maherhanna.mobarayat
 
-data class Game(val id: Int, val match_hometeam_name: String, val match_awayteam_name: String, var league_id: Int = 0, var prediction: Prediction? = null)
+import com.google.gson.annotations.SerializedName
+
+data class Game(
+    @SerializedName("match_id")
+    val id: Int,
+    @SerializedName("match_hometeam_name")
+    val homeTeamName: String,
+    @SerializedName("match_awayteam_name")
+    val awayTeamName: String,
+    @SerializedName("league_id")
+    var leagueId: Int = 0,
+    var prediction: Prediction? = null
+)

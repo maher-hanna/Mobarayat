@@ -143,7 +143,6 @@ class FootballViewModel : ViewModel() {
 
             override fun onResponse(call: Call, response: Response) {
                 response.body?.let { responseBody ->
-
                     val gameType = object : TypeToken<List<Game>>() {}.type
                     val games = gson.fromJson<List<Game>>(responseBody.string(), gameType)
                     val updatedLeagues = _leagues.value?.map { currentLeague ->
