@@ -11,5 +11,5 @@ data class Game(
     val awayTeamName: String,
     @SerializedName("league_id")
     var leagueId: Int = 0,
-    var prediction: Prediction? = null
+    var predictions: List<Prediction>? = null
 )

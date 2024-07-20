@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import org.json.JSONArray
 
 const val MOBARAYAT_TAG = "MOBARAYAT_TAG"
 
@@ -134,11 +135,11 @@ class FootballViewModel : ViewModel() {
     fun fetchGames(league: League, callback: (Boolean) -> Unit) {
         val request = Request.Builder()
             .url(
-                "${API_FOOTBALL_URL}?action=get_events&from=${dateFormat.format(league.seasonStart)}&to=${
+                "${BASE_URL}games.php?from=${dateFormat.format(league.seasonStart)}&to=${
                     dateFormat.format(
                         league.seasonEnd
                     )
-                }&league_id=${league.id}&APIkey=${API_KEY}"
+                }&league_id=${league.id}"
             )
             .build()
 
@@ -153,11 +154,57 @@ class FootballViewModel : ViewModel() {
 
             override fun onResponse(call: Call, response: Response) {
                 response.body?.let { responseBody ->
-                    val gameType = object : TypeToken<List<Game>>() {}.type
-                    val games = gson.fromJson<List<Game>>(responseBody.string(), gameType)
+                    val gamesJson = responseBody.string()
+
+                    // Custom deserialization to handle the nested predictions
+                    val gamesList = mutableListOf<Game>()
+                    val jsonArray = JSONArray(gamesJson)
+
+                    for (i in 0 until jsonArray.length()) {
+                        val gameJson = jsonArray.getJSONObject(i)
+                        val matchId = gameJson.getInt("match_id")
+                        val matchDate = gameJson.getString("match_date")
+                        val matchTime = gameJson.getString("match_time")
+                        val matchHometeamName = gameJson.getString("match_hometeam_name")
+                        val matchAwayteamName = gameJson.getString("match_awayteam_name")
+
+                        val predictionsList = mutableListOf<Prediction>()
+                        if (gameJson.has("predictions")) {
+                            val predictionsJsonArray = gameJson.getJSONArray("predictions")
+                            for (j in 0 until predictionsJsonArray.length()) {
+                                if(predictionsJsonArray.optJSONObject(j) != null){
+                                    val predictionJson = predictionsJsonArray.getJSONObject(j)
+                                    val homeTeamScore = predictionJson.getInt("home_team_score")
+                                    val awayTeamScore = predictionJson.getInt("away_team_score")
+                                    val predictionId = predictionJson.getInt("prediction_id")
+                                    val gameId = predictionJson.getInt("game_id")
+                                    val userId = predictionJson.getInt("user_id")
+
+                                    val prediction = Prediction(
+                                        homeScore = homeTeamScore,
+                                        awayScore = awayTeamScore,
+                                        id = predictionId,
+                                        gameId = gameId,
+                                        userId = userId
+                                    )
+                                    predictionsList.add(prediction)
+                                }
+
+                            }
+                        }
+
+                        val game = Game(
+                            id = matchId,
+                            homeTeamName = matchHometeamName,
+                            awayTeamName = matchAwayteamName,
+                            predictions = predictionsList
+                        )
+                        gamesList.add(game)
+                    }
+
                     val updatedLeagues = _leagues.value?.map { currentLeague ->
                         if (currentLeague.id == league.id) {
-                            league.copy(games = games)
+                            league.copy(games = gamesList)
                         } else {
                             currentLeague
                         }
@@ -207,7 +254,7 @@ class FootballViewModel : ViewModel() {
             if (league.id == leagueId) {
                 val updatedGames = league.games.map { game ->
                     if (game.id == gameId) {
-                        game.copy(prediction = prediction)
+                        game.copy(predictions = game.predictions?.toMutableList()?.apply {add(prediction)})
                     } else {
                         game
                     }
