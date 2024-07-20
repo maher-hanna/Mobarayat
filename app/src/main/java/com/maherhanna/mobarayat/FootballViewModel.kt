@@ -56,7 +56,7 @@ class FootballViewModel : ViewModel() {
 
     private fun fetchLeagues() {
         val request = Request.Builder()
-            .url("${API_FOOTBALL_URL}?action=get_leagues&APIkey=${API_KEY}")
+            .url("${BASE_URL}leagues.php")
             .build()
 
         client.newCall(request).enqueue(object : Callback {
@@ -78,7 +78,6 @@ class FootballViewModel : ViewModel() {
                             seasonStart = seasonStart,
                             seasonEnd = seasonEnd,
                             leagueLogo = leagueMap["league_logo"] ?: "",
-                            countryLogo = leagueMap["country_logo"] ?: ""
                         )
                     }
                     _leagues.postValue(leagues)
@@ -276,4 +275,3 @@ class FootballViewModel : ViewModel() {
         return Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
     }
 }
-

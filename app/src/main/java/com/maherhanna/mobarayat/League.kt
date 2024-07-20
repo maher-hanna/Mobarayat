@@ -9,5 +9,4 @@ data class League(
     val seasonEnd: Date,
     val games: List<Game> = emptyList(),
     val leagueLogo: String,
-    val countryLogo: String
 )
