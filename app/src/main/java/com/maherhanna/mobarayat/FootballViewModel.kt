@@ -78,6 +78,7 @@ class FootballViewModel : ViewModel() {
                             seasonStart = seasonStart,
                             seasonEnd = seasonEnd,
                             leagueLogo = leagueMap["league_logo"] ?: "",
+                            hasPredictions = leagueMap["has_predictions"] == "true"
                         )
                     }
                     _leagues.postValue(leagues)

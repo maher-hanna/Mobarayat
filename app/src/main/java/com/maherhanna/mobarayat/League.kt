@@ -7,6 +7,7 @@ data class League(
     val name: String,
     val seasonStart: Date,
     val seasonEnd: Date,
-    val games: List<Game> = emptyList(),
     val leagueLogo: String,
+    val hasPredictions: Boolean,
+    val games: List<Game> = emptyList(),
 )
